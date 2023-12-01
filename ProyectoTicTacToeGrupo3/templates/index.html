@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe - Cliente</title>
+    <!-- Agrega el enlace al archivo CSS de Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url('menu_back.jpg'); /* Conserva tu imagen de fondo */
+            background-size: cover;
+            background-repeat: no-repeat;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            margin-top: 20px;
+            background-color: rgba(255, 255, 255, 0.1); /* Fondo blanco transparente */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 5px;
+            justify-content: center; /* Centra horizontalmente */
+            align-items: center; /* Centra verticalmente */
+            margin: 0 auto; /* Agrega margen automático a los lados para centrar */
+        }
+
+        button {
+            width: 100px;
+            height: 100px;
+            font-size: 20px;
+            background-color: #ffffff; /* Morado más claro */
+            color: #000000; /* Texto blanco */
+            border: 2px solid #4527A0; /* Borde más oscuro */
+            border-radius: 10px; /* Bordes redondeados */
+            transition: background-color 0.3s, color 0.3s, transform 0.3s; /* Transiciones suaves */
+        }
+
+        button:hover {
+            background-color: #4527A0; /* Cambia el fondo a morado más oscuro en el hover */
+            color: #FFFFFF; /* Texto blanco en el hover */
+            transform: scale(1.1); /* Efecto de escala en el hover */
+        }
+
+
+
+        #statistics {
+            margin-bottom: 10px;
+        }
+
+        #chat {
+        width: 100%;
+        height: 215px;
+        margin-top: 10px;
+        resize: none;
+        }
+
+        #chat,
+        #chatInput,
+        #chatButton,
+        #disconnectButton {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        #chat,
+        #chatInput {
+            padding: 10px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Agregado: Título de la página -->
+        <h1 class="text-center mb-4">Tic Tac Toe</h1>
+
+        <!-- Utiliza las clases de Bootstrap para mejorar la apariencia -->
+        <div class="text-center">
+            <!-- Agrega la clase text-center para centrar el contenido -->
+            <div id="board" class="mb-4"></div>
+        </div>
+
+        <div id="statistics" class="alert alert-info"></div>
+        <textarea id="chat" class="form-control" readonly></textarea>
+        <input type="text" id="chatInput" class="form-control">
+        <button id="chatButton" class="btn btn-primary mt-2" onclick="sendChatMessage()">Enviar mensaje de chat</button>
+        <button id="disconnectButton" class="btn btn-danger mt-2" onclick="disconnect()">Desconectar</button>
+    </div>
+
+    <!-- Agrega el script de Bootstrap y jQuery (necesario para Bootstrap) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+      <script>
+         const board = document.getElementById('board');
+        const chat = document.getElementById('chat');
+        const chatInput = document.getElementById('chatInput');
+        const chatButton = document.getElementById('chatButton');
+
+        const socket = new WebSocket('ws://3.88.158.214:12345'); // Replace with your EC2 instance's public IP
+
+        //const socket = new WebSocket('ws://localhost:12345'); // Cambia la URL con la dirección de tu servidor WebSocket
+
+        // Evento que se dispara cuando se abre la conexión WebSocket
+        socket.addEventListener('open', (event) => {
+            console.log('Conexión WebSocket abierta:', event);
+        });
+
+        // Evento que se dispara cuando se recibe un mensaje del servidor
+        socket.addEventListener('message', (event) => {
+            const message = event.data;
+            handleServerMessage(message);
+        });
+
+        // Lógica de juego en el lado del cliente
+        const buttons = createBoard();
+        let playerNumber;
+
+        function disconnect() {
+    socket.send("/disconnect");
+}
+
+        function handleStatisticsMessage(message) {
+            const statisticsDiv = document.getElementById('statistics');
+            statisticsDiv.innerText = message;
+        }
+
+        function createBoard() {
+           const buttons = [];
+          for (let row = 0; row < 3; row++) {
+           for (let col = 0; col < 3; col++) {
+            const button = document.createElement('button');
+            button.innerText = '';
+            button.addEventListener('click', () => sendMove(row, col));
+            board.appendChild(button);
+            buttons.push(button);
+        }
+    }
+    return buttons;
+}
+
+
+        function sendMove(row, col) {
+            const move = `${row},${col}`;
+            socket.send(move);
+        }
+
+        function sendChatMessage() {
+            const message = chatInput.value;
+            if (message.trim() !== '') {
+                socket.send(`/chat ${message}`);
+                chatInput.value = '';
+            }
+        }
+
+        function handleServerMessage(message) {
+            if (message.startsWith("<Board>")) {
+                updateBoardDisplay(message);
+            } else if (message.startsWith("<Chat>")) {
+                const chatMessage = message.slice("<Chat> ".length);
+                addChatMessage(chatMessage);
+            } else if (message.startsWith("<Statistics>")) {
+                const statisticsMessage = message.slice("<Statistics> ".length);
+                handleStatisticsMessage(statisticsMessage);
+            }else if (message.startsWith("<Disconnect>")) {
+            const disconnectMessage = message.slice("<Disconnect> ".length);
+            addChatMessage(disconnectMessage);
+            }
+        }
+
+       function updateBoardDisplay(boardXml) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(boardXml, "text/xml");
+    const rows = Array.from(xmlDoc.getElementsByTagName('Row'));
+
+    for (let i = 0; i < rows.length; i++) {
+        const cells = Array.from(rows[i].getElementsByTagName('Cell'));
+        for (let j = 0; j < cells.length; j++) {
+            const cellValue = cells[j].innerHTML; // Utilizar innerHTML en lugar de textContent
+            const buttonIndex = i * 3 + j;
+            buttons[buttonIndex].innerText = cellValue;
+        }
+    }
+}
+        function addChatMessage(message) {
+            chat.value += message + '\n';
+        }
+    </script>
+</body>
+</html>
